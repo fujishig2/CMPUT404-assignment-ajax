@@ -54,10 +54,23 @@ class World:
     def world(self):
         return self.space
 
+class Users:
+    def __init__(self):
+        self.users = {}
+    
+    def setWorld(self, id, world):
+        self.users[id] = world
+
+    def getWorld(self, id):
+        return self.users[id]
+
+
 # you can test your webservice from the commandline
 # curl -v   -H "Content-Type: application/json" -X PUT http://127.0.0.1:5000/entity/X -d '{"x":1,"y":1}' 
 
-myWorld = World()          
+myWorld = World()
+listener = 1      
+users = Users()
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
 # this should come with flask but whatever, it's not my project.
@@ -99,28 +112,20 @@ def update(entity):
 @app.route("/world", methods=['POST','GET'])    
 def world():
     if request.method == 'GET':
+        print(request)
         return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
     elif request.method == 'POST':
         try:
             req_json = flask_post_json()
-            response = {}
-            if req_json != myWorld.world():
-                world = myWorld.world()
-                for key in world:
-                    if key not in req_json or req_json[key] != world[key]:
-                        response[key] = world[key]
-                for key in req_json:
-                    if key not in world:
-                        response[key] = ""
-            return app.response_class(response=json.dumps(response), mimetype='application/json')
+            world.clear()
+            for key in req_json:
+                world.set(key, req_json[key])
+            return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
         except:
             return "Cannot update world.", 400
         
     else:
         return "Method not handled.", 500
-        
-    '''you should probably return the world here'''
-    return None
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
@@ -139,6 +144,40 @@ def clear():
         except:
             return "Cannot clear world.", 400
     return "Method not handled.", 500
+
+@app.route("/listener", methods=["GET"])
+def get_listener():
+    global listener
+    global users
+    if request.method == 'GET':
+        response = {"listener": listener}
+        users.setWorld(str(listener), World())
+        listener += 1
+        return app.response_class(response=json.dumps(response), mimetype='application/json') 
+    else:
+        return "Method not handled.", 500
+
+@app.route("/listener/<listener>", methods=["GET"])
+def get_diff(listener):
+    global users
+    if request.method == 'GET':
+        try:
+            response = {}
+            world = myWorld.world()
+            userWorld = users.getWorld(listener)
+            # print(users.getWorld(listener).world())
+            for key in world:
+                if key not in userWorld.world():
+                    response[key] = world[key]
+                    userWorld.set(key, world[key])
+            for key in userWorld.world():
+                if key not in world:
+                    response["message"] = "refresh"
+            return app.response_class(response=json.dumps(response), mimetype='application/json') 
+        except:
+            return "Invalid listener.", 400
+    else:
+        return "Method not handled.", 500
 
 
 if __name__ == "__main__":
