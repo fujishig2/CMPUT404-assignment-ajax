@@ -34,11 +34,13 @@ var H = canvas.height = window.innerHeight-50;
 
 function sendJSONXMLHTTPRequest(url, objects, callback) {
     var xhr = new XMLHttpRequest();
+    // Setup the open method
     xhr.open(objects.request, url, true);
     xhr.onreadystatechange = function () {
         if (xhr.readyState==4) {
             try {
                 if (xhr.status==200) {
+                    // Setup the callback function with the values returned parsed.
                     callback(JSON.parse(xhr.responseText));
                 }
             } 
@@ -47,19 +49,29 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
             }
         }
     };
+    // Handle a Get request
     if (objects.request == "GET") {
         xhr.send();
+
+    // Handle a Post/Put request.
     } else if (objects.request == "POST" || objects.request == "PUT" && objects.body) {
+        // Apply necessary json headers
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.setRequestHeader("Accept", "application/json");
+        //Send the json string values
         xhr.send(JSON.stringify(objects.body));
     }
 }
 
+// Setup global variables
 world = {};
 var counter = 0;
 var listener;
 
+// World update handler. Handles all world related calls and frame drawing. This means that the only
+// time the frame will get changed is if the world has changed on the server. This will keep every
+// users frames and latency consistent across the board, whether they are the ones drawing or simply
+// viewing it.
 function handleWorld(data) {
     if (data != {} && data['message'] != 'refresh') {
         for(var entity in data) {
@@ -72,19 +84,15 @@ function handleWorld(data) {
     }
 }
 
+// Handles Entity calls
 function handleEntity(data) {}
 
+// Handles the listner Id call
 function handleListenerId(data) {
     listener = data.listener;
 }
 
-function getWorld() {
-    request = {
-        request: "GET"
-    }
-    sendJSONXMLHTTPRequest('/world', request, handleWorld);
-}
-
+// Setup the get request for a call to get the listner ID
 function getListenerId() {
     request = {
         request: "GET"
@@ -92,6 +100,8 @@ function getListenerId() {
     sendJSONXMLHTTPRequest('/listener', request, handleListenerId);
 }
 
+// Setup the get request for a call to get the difference in world values from
+// the last time this was called. If it's the first call, we'll get the entire world.
 function getListener() {
     request = {
         request: "GET"
@@ -99,7 +109,7 @@ function getListener() {
     sendJSONXMLHTTPRequest('/listener/' + listener, request, handleWorld);
 }
 
-
+// Draw circle function
 function drawCircle(context,entity) {
     with(context) {
         beginPath();              
@@ -114,6 +124,7 @@ function drawCircle(context,entity) {
     }
 }
 
+// Draw rectangle function
 function drawRectangle(context,entity) {
     with(context) {
         beginPath();              
@@ -144,7 +155,7 @@ function clearFrame() {
 
 }
 
-// This actually draws the frame
+// This actually draws the frame. Draws a rectangle if no radius is provided
 function renderFrame() {
     clearFrame();
     for (var key in world) {
@@ -192,7 +203,8 @@ function getPosition(e) {
 	}
 }
 
-
+// Add an entity post request call. Adds an entity by sending a post request of
+// the entity to the server.
 function addEntity(entity, data) {
     request = {
         request: "POST",
@@ -202,7 +214,6 @@ function addEntity(entity, data) {
 }
 
 function addEntityWithoutName(data) {
-    //var name = "X"+Math.floor((Math.random()*100)+1);
     var name = "X"+(counter++)%100000;
     addEntity(name,data);
 }
@@ -303,12 +314,12 @@ mouse = (function() {
     return self;
 })();
 
+// List of colours which will be called at random
 const colours = ['#347067', '#799662', '#7a5c74', '#fc7544', '#fcff61', '#a8ffec', '#ff007b', '#ffa408', '#94ff08', 
                     '#0000ff', '#ff0000', '#00ff00', '#4a1da2', '#7ad857', '#bd48e3', '#8aa557', '#fbc760', '#5deee1', 
                     '#b21298', '#6f2033', '#2d3421', '#ffffff', '#ad3e36'];
 
 // Add the application specific mouse listeners!
-//XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
     addEntityWithoutName({'x':x+25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)]});
     addEntityWithoutName({'x':x+25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)]});
@@ -332,11 +343,13 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
                           'radius':7});
 });
 
-
+// Gets the listener Id when the page is loaded
 window.onload = function() {
     getListenerId();
 }
 
+// Update by calling the get listener function which will send a get
+// request to the server and it will return the entities which are missing.
 function update() {
     if (listener != undefined) {
         getListener();
