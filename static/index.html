@@ -21,6 +21,7 @@
         limitations under the License.
     "/>
     <script src="json2.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   </head> 
   <body bgcolor="black" height="100%" width="100%"> 
     <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
@@ -34,12 +35,12 @@ var H = canvas.height = window.innerHeight-50;
 
 function sendJSONXMLHTTPRequest(url, objects, callback) {
     var xhr = new XMLHttpRequest();
+    xhr.open(objects.request, url, true);
     xhr.onreadystatechange = function () {
         if (xhr.readyState==4) {
             try {
                 if (xhr.status==200) {
-                    //XXX: parse some JSON from the request!
-                    //XXX: Pass the data to the callback!
+                    callback(JSON.parse(xhr.responseText));
                 }
             } 
             catch(e) {
@@ -47,25 +48,66 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
             }
         }
     };
-    //XXX: POST to a URL
-    //XXX: set the mimetype and the accept headers!
-    // Remember to use application/json !
+    if (objects.request == "GET") {
+        xhr.send();
+    } else if (objects.request == "POST" || objects.request == "PUT" && objects.body) {
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("Accept", "application/json");
+        xhr.send(JSON.stringify(objects.body));
+    }
+}
+
+world = {};
+var counter = 0;
+
+function handleWorld(data) {
+    if (data != {}) {
+        for(var entity in data) {
+            if (data[entity] != "") {
+                world[entity] = data[entity];
+            } else {
+                delete world[entity];
+            }
+        }
+        counter = Object.keys(world).length;
+        drawNextFrame();
+    }
+}
+
+function handleEntity(data) {}
+
+function getWorld() {
+    request = {
+        request: "GET"
+    }
+    sendJSONXMLHTTPRequest('/world', request, handleWorld);
 }
 
 
-world = {};
-
-//XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
     with(context) {
         beginPath();              
         lineWidth = 3;
         var x = entity["x"];
         var y = entity["y"];
-        //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
+        arc(x, y, (entity["radius"])?entity["radius"]:25, 0, 2.0 * Math.PI, false);  
+        fill();
+        stroke();                                
+    }
+}
+
+function drawRectangle(context,entity) {
+    with(context) {
+        beginPath();              
+        lineWidth = 3;
+        var x = entity["x"];
+        var y = entity["y"];
+        fillStyle = entity["colour"];
+        strokeStyle = fillStyle;
+        rect(x-15, y-15, 30, 30);  
+        fill();
         stroke();                                
     }
 }
@@ -73,9 +115,6 @@ function drawCircle(context,entity) {
 function prepEntity(entity) {
     if (!entity["colour"]) {
         entity["colour"] = "#FF0000";
-    }
-    if (!entity["radius"]) {
-        entity["radius"] = 50;
     }
     return entity;
 }
@@ -94,7 +133,11 @@ function renderFrame() {
     clearFrame();
     for (var key in world) {
         var entity = world[key];
-        drawCircle(context,prepEntity(entity));
+        if (!entity["radius"]) {
+            drawRectangle(context, prepEntity(entity))
+        } else {
+            drawCircle(context,prepEntity(entity));
+        }
     }
 }
 
@@ -135,16 +178,16 @@ function getPosition(e) {
 
 
 function addEntity(entity, data) {
-    world[entity] = data;
-    drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just  modified!
-
+    request = {
+        request: "POST",
+        body: data
+    }
+    sendJSONXMLHTTPRequest('/entity/' + entity, request, handleEntity);
 }
 
-var counter = 0;
 function addEntityWithoutName(data) {
     //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%100;
+    var name = "X"+(counter++)%100000;
     addEntity(name,data);
 }
 
@@ -244,29 +287,47 @@ mouse = (function() {
     return self;
 })();
 
+const colours = ['#347067', '#799662', '#7a5c74', '#fc7544', '#fcff61', '#a8ffec', '#ff007b', '#ffa408', '#94ff08', 
+                    '#0000ff', '#ff0000', '#00ff00', '#4a1da2', '#7ad857', '#bd48e3', '#8aa557', '#fbc760', '#5deee1', 
+                    '#b21298', '#6f2033', '#2d3421', '#ffffff', '#ad3e36'];
+
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName({'x':x+25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)]});
+    addEntityWithoutName({'x':x+25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)]});
+    addEntityWithoutName({'x':x-25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)]});
+    addEntityWithoutName({'x':x-25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)]});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x+25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
+    addEntityWithoutName({'x':x+25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
+    addEntityWithoutName({'x':x-25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
+    addEntityWithoutName({'x':x-25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({'x':x,'y':y,'colour':colours[Math.floor(Math.random()*colours.length)],
+                          'radius':7});
 });
 
 
 function update() {
-    //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    request = {
+        request: "POST",
+        body: world
+    }
+    sendJSONXMLHTTPRequest('/world', request, handleWorld);
     drawFrame();
 }
 
 // 30 frames per second
-setInterval( update, 1000/30.0);
+setInterval( update, 1000/30);
 
 
 

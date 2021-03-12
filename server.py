@@ -72,29 +72,74 @@ def flask_post_json():
         return json.loads(request.form.keys()[0])
 
 @app.route("/")
-def hello():
+def index():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return flask.send_from_directory('static','index.html')
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
+    try:
+        if request.method == "POST":
+            req_json = flask_post_json()
+            if myWorld.get(entity) != {}:
+                entity = "X" + str(len(myWorld.world()))
+            myWorld.set(entity, req_json)
+            return app.response_class(response=json.dumps(myWorld.get(entity)), mimetype='application/json')
+        elif request.method == "PUT":
+            req_json = flask_post_json()
+            for key in req_json:
+                myWorld.update(entity, key, req_json[key])
+            return app.response_class(response=json.dumps(myWorld.get(entity)), mimetype='application/json')
+
+    except:
+        return "Cannot update entity.", 400
     return None
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
+    if request.method == 'GET':
+        return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
+    elif request.method == 'POST':
+        try:
+            req_json = flask_post_json()
+            response = {}
+            if req_json != myWorld.world():
+                world = myWorld.world()
+                for key in world:
+                    if key not in req_json or req_json[key] != world[key]:
+                        response[key] = world[key]
+                for key in req_json:
+                    if key not in world:
+                        response[key] = ""
+            return app.response_class(response=json.dumps(response), mimetype='application/json')
+        except:
+            return "Cannot update world.", 400
+        
+    else:
+        return "Method not handled.", 500
+        
     '''you should probably return the world here'''
     return None
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    if request.method == 'GET':
+        return app.response_class(response=json.dumps(myWorld.get(entity)), mimetype='application/json')
+    return "Method not handled.", 500
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    if request.method == 'GET' or request.method == 'POST':
+        try:
+            myWorld.clear()
+            return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
+        except:
+            return "Cannot clear world.", 400
+    return "Method not handled.", 500
+
 
 if __name__ == "__main__":
     app.run()
