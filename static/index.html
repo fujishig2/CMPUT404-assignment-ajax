@@ -21,7 +21,6 @@
         limitations under the License.
     "/>
     <script src="json2.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   </head> 
   <body bgcolor="black" height="100%" width="100%"> 
     <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
@@ -59,28 +58,45 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
 
 world = {};
 var counter = 0;
+var listener;
 
 function handleWorld(data) {
-    if (data != {}) {
+    if (data != {} && data['message'] != 'refresh') {
         for(var entity in data) {
-            if (data[entity] != "") {
-                world[entity] = data[entity];
-            } else {
-                delete world[entity];
-            }
+            world[entity] = data[entity];
         }
         counter = Object.keys(world).length;
         drawNextFrame();
+    } else if (data['message'] == 'refresh') {
+        window.location.reload();
     }
 }
 
 function handleEntity(data) {}
+
+function handleListenerId(data) {
+    listener = data.listener;
+}
 
 function getWorld() {
     request = {
         request: "GET"
     }
     sendJSONXMLHTTPRequest('/world', request, handleWorld);
+}
+
+function getListenerId() {
+    request = {
+        request: "GET"
+    }
+    sendJSONXMLHTTPRequest('/listener', request, handleListenerId);
+}
+
+function getListener() {
+    request = {
+        request: "GET"
+    }
+    sendJSONXMLHTTPRequest('/listener/' + listener, request, handleWorld);
 }
 
 
@@ -317,12 +333,14 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 });
 
 
+window.onload = function() {
+    getListenerId();
+}
+
 function update() {
-    request = {
-        request: "POST",
-        body: world
+    if (listener != undefined) {
+        getListener();
     }
-    sendJSONXMLHTTPRequest('/world', request, handleWorld);
     drawFrame();
 }
 
